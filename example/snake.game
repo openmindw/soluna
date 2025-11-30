@@ -1,0 +1,3 @@
+entry : example/snake.lua
+project : snake
+window_title : Snake Game
