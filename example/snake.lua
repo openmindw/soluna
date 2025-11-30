@@ -23,6 +23,16 @@ local COLOR_SNAKE_BODY = 0x22c55eff
 local COLOR_FOOD = 0xef4444ff
 local COLOR_BORDER = 0x374151ff
 local COLOR_SCORE_BG = 0x111827ff
+local COLOR_SCORE_BAR = 0xfbbf24ff
+
+-- Score display constants
+local SCORE_BAR_WIDTH = 8
+local SCORE_BAR_GAP = 12
+local SCORE_BAR_MIN_HEIGHT = 4
+local SCORE_BAR_SCALE = 2
+local SCORE_AREA_HEIGHT = 20
+local SCORE_OFFSET_X = 10
+local SCORE_OFFSET_Y = 35
 
 -- Direction constants
 local DIR_UP = 1
@@ -88,12 +98,21 @@ end
 
 -- Spawn food at a random position not occupied by the snake
 local function spawn_food()
+    -- Check if snake fills entire grid (win condition)
+    local total_cells = GRID_WIDTH * GRID_HEIGHT
+    if #snake >= total_cells then
+        -- Snake fills the entire grid - game won
+        return false
+    end
+    
     local attempts = 0
     repeat
         food.x = math.random(0, GRID_WIDTH - 1)
         food.y = math.random(0, GRID_HEIGHT - 1)
         attempts = attempts + 1
     until not is_snake_position(food.x, food.y) or attempts > 1000
+    
+    return true
 end
 
 -- Initialize the game
@@ -144,7 +163,11 @@ local function move_snake()
         return
     end
     
-    -- Check self collision (exclude tail since it will move)
+    -- Check self collision
+    -- We check against segments 1 to #snake-1 (excluding tail) because:
+    -- - If food is NOT eaten: tail will move away, so it's safe to move into tail position
+    -- - If food IS eaten: tail stays, but new_head can't be at food position AND tail position
+    --   simultaneously (food would have been eaten before reaching this point in the same move)
     for i = 1, #snake - 1 do
         if snake[i].x == new_head.x and snake[i].y == new_head.y then
             game_over = true
@@ -216,18 +239,22 @@ local function draw_food()
 end
 
 -- Draw score display
+-- Note: Uses visual bar representation since Soluna's text rendering
+-- requires font setup. Each digit is shown as a bar with height proportional to its value.
 local function draw_score()
     local offset_x, offset_y = get_game_offset()
     -- Score background
     batch:add(matquad.quad(120, 30, COLOR_SCORE_BG), offset_x, offset_y - 40)
     
-    -- Draw score as small rectangles (simple digit representation)
+    -- Draw score as small rectangles (visual digit representation)
     local score_str = tostring(score)
     for i = 1, #score_str do
         local digit = tonumber(score_str:sub(i, i))
-        -- Simple representation: filled rectangle whose height represents the digit
-        local bar_h = 4 + digit * 2
-        batch:add(matquad.quad(8, bar_h, 0xfbbf24ff), offset_x + 10 + (i - 1) * 12, offset_y - 35 + (20 - bar_h) / 2)
+        -- Bar height scales with digit value (0-9)
+        local bar_h = SCORE_BAR_MIN_HEIGHT + digit * SCORE_BAR_SCALE
+        local bar_x = offset_x + SCORE_OFFSET_X + (i - 1) * SCORE_BAR_GAP
+        local bar_y = offset_y - SCORE_OFFSET_Y + (SCORE_AREA_HEIGHT - bar_h) / 2
+        batch:add(matquad.quad(SCORE_BAR_WIDTH, bar_h, COLOR_SCORE_BAR), bar_x, bar_y)
     end
 end
 
